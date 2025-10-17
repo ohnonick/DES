@@ -4,6 +4,8 @@ Programmer: Nicky Victoriano
 CSVs transcribed by me
 */
 
+const fs = require('fs');
+
 // #region Tables
 
 const INITIAL_PERMUTATION = [
@@ -44,7 +46,7 @@ const EXPANSION_PERMUTATION = [
     16,17,18,19,20,21,
     20,21,22,23,24,25,
     24,25,26,27,28,29,
-    28,29,30,31,32,33,
+    28,29,30,31,32,1,
 ]
 
 const PC_1 = [
@@ -168,6 +170,7 @@ if (INPUT.encryption == true){
         subkeyGeneration();
         if (ROUND != 16){
             let newRight = feistelFunction();
+            console.log("Permuted:", newRight, "\n")
             L_HALF.push(R_HALF[ROUND]);
             R_HALF.push(manualXor(newRight, L_HALF[ROUND]));
         }else{
@@ -186,16 +189,13 @@ createOutput();
 // #endregion
 
 // #region Main Functions
-
-const fs = require('fs');
-
 /**
  * Reads input file. `ARGS` must be assigned.
  */
 function readInput() {
     try {
         const data = fs.readFileSync(ARGS[2], 'utf8').trim();
-        console.log('Input File:', data);
+        console.log('Input File:\n', data);
 
         let inputCommands = data.split('\n').map(line => line.trim());
 
@@ -203,7 +203,7 @@ function readInput() {
         INPUT = {
             dataBlock: argumentToBinary(inputCommands[0]),
             key: argumentToBinary(inputCommands[1]),
-            mode: inputCommands[2].includes('encryption'),
+            encryption: inputCommands[2].includes('encryption'),
         };
 
     } catch (err) {
@@ -225,7 +225,7 @@ function argumentToBinary(input) {
     let hex = hexMatch[1];
     let decimal = parseInt(hex, 16);
     let binaryString = decimal.toString(2);
-    let paddedBinary = binaryString.padStart(Math.ceil(binaryString.length / 4) * 4, '0');
+    let paddedBinary = binaryString.padStart(64, '0');
     return paddedBinary;
 }
 
@@ -241,15 +241,16 @@ function createOutput(){
     }
     data = data + '\n';
     for(let i = 0; i <= 16; i++){ // L0:L16, R0:R16
+        data = data + 'L' + i.toString() + '=' + L_HALF[i] + '\n';
         data = data + 'R' + i.toString() + '=' + R_HALF[i] + '\n';
     }
     data = data + '\n';
-    data = data + 'Result=' + OUTPUT;
+    data = data + 'Result=' + parseInt(OUTPUT, 2).toString(16).toUpperCase();
 
 
     fs.writeFile(ARGS[3], data, (err) => {
         if (err) throw err;
-        console.log('File saved! Output:\n' + data);
+        console.log('File saved! Output:\n', data);
     });
 }
 
@@ -262,10 +263,12 @@ function createOutput(){
  * @returns {string} Shuffled padded binary string
  */
 function initialPermutation(){
+    console.log("Input:", INPUT.dataBlock);
     let newBits = '';
     INITIAL_PERMUTATION.forEach((index, i) =>{
         newBits = newBits + INPUT.dataBlock[index - 1];
     });
+    console.log("Output:", newBits);
     return newBits;
 }
 
@@ -273,19 +276,14 @@ function initialPermutation(){
  * Generates first C/D-keys and adds them to `C_KEYS`\\`D_KEYS`.
  */
 function keyThroughPC1(){
-    // Select bits
-    let removingParity = '';
-    for(let i = 0; i < 64; i++){
-        if(((i+1) % 8) != 0){
-            removingParity = removingParity + INPUT.key[i];
-        }
-    }
+    console.log("Key:", INPUT.key);
 
     // Permute bits using PC-1
     let permutation = '';
     PC_1.forEach((index, i) =>{
-        permutation = permutation + removingParity[index - 1];
+        permutation = permutation + INPUT.key[index - 1];
     });
+    console.log("Permuted:", permutation);
 
     // Create substrings
     let C = permutation.substring(0, 28);
@@ -336,9 +334,13 @@ function subkeyGeneration(){
  * @returns {string} Feistel'd right side binary string
  */
 function feistelFunction(){
-    let right = expansionPermutation();
-    let xor = manualXor(right, SUBKEYS[ROUND]);
+    console.log("OG:", R_HALF[ROUND])
+    let expansion = expansionPermutation();
+    console.log("Expansion:", expansion)
+    let xor = manualXor(expansion, SUBKEYS[ROUND]);
+    console.log("XOR:", xor)
     let sbox = sboxSubstitution(xor);
+    console.log("Sbox:", sbox)
     return permuteFeistel(sbox);    
 }
 
@@ -358,7 +360,7 @@ function manualXor(right, key){
     let xor = '';
 
     // Manual XOR (lol)
-    for(let i = 0; i < 48; i++){
+    for(let i = 0; i < key.length; i++){
         if (key[i] == right[i]){
             xor = xor + '0';
         }else{
@@ -373,12 +375,12 @@ function sboxSubstitution(xor){
     let block = '';
     
     for(let i = 0; i < 8; i++){
-        let subBlock = xor.substring(i*6, i + 6);
+        let subBlock = xor.substring(i*6, i*6 + 6);
         let x = parseInt((subBlock[0] + subBlock[5]), 2);
         let y = parseInt(subBlock.substring(1, 5), 2);
         let chunk = SBOXES[i][x][y];
         let binaryChunk = chunk.toString(2);
-        let paddedChunk = binaryChunk.padStart(Math.ceil(binaryString.length / 4) * 4, '0');
+        let paddedChunk = binaryChunk.padStart(4, '0');
         block = block + paddedChunk;
     }
 
