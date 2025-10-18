@@ -184,7 +184,6 @@ OUTPUT = inverseInitialPermutation(R_HALF[16] + L_HALF[16]); // Inverse initial 
 
 createOutput(); // End //
 
-
 // #endregion
 
 // #region Main Functions
@@ -225,7 +224,7 @@ function hexToBinary(hexString) {
     hex = hex.padStart(16, '0');
     let binaryString = '';
     for (let char of hex) {
-        binaryString = binaryString + parseInt(char, 16).toString(2).padStart(4, '0');
+        binaryString += parseInt(char, 16).toString(2).padStart(4, '0');
     }
     return binaryString;
 }
@@ -281,7 +280,7 @@ function createOutput(){
 function initialPermutation(){
     let newBits = '';
     for(let index of INITIAL_PERMUTATION)
-        newBits = newBits + INPUT.dataBlock[index - 1];
+        newBits += INPUT.dataBlock[index - 1];
     return newBits;
 }
 
@@ -291,7 +290,7 @@ function initialPermutation(){
 function keyThroughPC1(){
     let permutation = '';
     for(let index of PC_1)
-        permutation = permutation + INPUT.key[index - 1];
+        permutation += INPUT.key[index - 1];
 
     // Create substrings
     let C = permutation.substring(0, 28);
@@ -327,7 +326,7 @@ function subkeyGeneration(roundIndex){
     let block = C_KEYS[roundIndex + 1] + D_KEYS[roundIndex + 1];
     let permutation = '';
     for(let index of PC_2)
-        permutation = permutation + block[index - 1];
+        permutation += block[index - 1];
     SUBKEYS.push(permutation);
 }
 
@@ -351,28 +350,23 @@ function expansionPermutation(roundIndex){
     let right = R_HALF[roundIndex];
     let permutation = '';
     for(let index of EXPANSION_PERMUTATION)
-        permutation = permutation + right[index - 1];
+        permutation += right[index - 1];
     return permutation;
 }
 
 function manualXor(right, key){
     let xor = '';
-
-    // Manual XOR (lol)
-    for(let i = 0; i < key.length; i++){
-        if (key[i] == right[i]){
-            xor = xor + '0';
-        }else{
-            xor = xor + '1';
-        }
+    for(let i = 0; i < key.length; i++){ // Manual XOR (lol)
+        if (key[i] == right[i])
+            xor += '0';
+        else
+            xor += '1';
     }
-
     return xor;
 }
 
 function sboxSubstitution(xor){
     let block = '';
-    
     for(let i = 0; i < 8; i++){
         let subBlock = xor.substring(i*6, i*6 + 6);
         let x = parseInt((subBlock[0] + subBlock[5]), 2);
@@ -380,17 +374,15 @@ function sboxSubstitution(xor){
         let chunk = SBOXES[i][x][y];
         let binaryChunk = chunk.toString(2);
         let paddedChunk = binaryChunk.padStart(4, '0');
-        block = block + paddedChunk;
+        block += paddedChunk;
     }
-
     return block;
 }
 
 function permuteFeistel(sbox){
     let permutation = '';
     for(let index of PERMUTATION_FUNCTION)
-        permutation = permutation + sbox[index - 1];
-
+        permutation += sbox[index - 1];
     return permutation;
 }
 
@@ -406,7 +398,7 @@ function permuteFeistel(sbox){
 function inverseInitialPermutation(concatenation){
     let newBits = '';
     for(let index of INVERSE_IP)
-        newBits = newBits + concatenation[index - 1];
+        newBits += concatenation[index - 1];
     return newBits;
 }
 
