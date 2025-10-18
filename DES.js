@@ -1,7 +1,7 @@
 /*
 DES Encryptor / Decryptor [CS454 : Assignment 1]
 Programmer: Nicky Victoriano
-CSVs transcribed by me
+CSVs transcribed by me. Run using node.
 */
 
 const fs = require('fs');
@@ -149,7 +149,6 @@ const ARGS = process.argv;
 let INPUT;
 
 // Storage for all output strings
-let ROUND = 0;
 let C_KEYS = []; // C0 - C16
 let D_KEYS = []; // D0 - D16
 let SUBKEYS = []; // K1 - K16
@@ -157,32 +156,33 @@ let L_HALF = []; // L0 - L16
 let R_HALF = []; // R0 - R16
 let OUTPUT;
 
-readInput();
-if (INPUT.encryption == true){
-    for (ROUND = 0; ROUND <= 16; ROUND++){
-        if (ROUND == 0){
-            let IP = initialPermutation();
-            keyThroughPC1();
-            L_HALF.push(IP.substring(0, 32));
-            R_HALF.push(IP.substring(32))
-        }
-        shiftKey();
-        subkeyGeneration();
-        if (ROUND != 16){
-            let newRight = feistelFunction();
-            L_HALF.push(R_HALF[ROUND]);
-            R_HALF.push(manualXor(newRight, L_HALF[ROUND]));
-        }else{
-            let left = L_HALF[ROUND];
-            L_HALF.push(R_HALF[ROUND]);
-            R_HALF.push(left);
-            OUTPUT = inverseInitialPermutation(L_HALF[ROUND + 1] + R_HALF[ROUND + 1]);
-        }
+readInput(); // Start //
+
+for (let i = 0; i <= 16; i++){ // Key setup //
+    if(i == 0)
+        keyThroughPC1();
+    else{
+        shiftKey(i - 1);
+        subkeyGeneration(i - 1);
     }
-}else{
-    // Decryption
 }
-createOutput();
+
+let IP = initialPermutation(); // Initial permutation //
+L_HALF.push(IP.substring(0, 32));
+R_HALF.push(IP.substring(32))
+
+for (let roundIndex = 0; roundIndex < 16; roundIndex++){ // Encryption or Decryption //
+    let keyIndex = INPUT.encryption ? roundIndex : (15 - roundIndex);
+    let subkey = SUBKEYS[keyIndex];
+
+    let newRight = feistelFunction(roundIndex, subkey);
+    L_HALF.push(R_HALF[roundIndex]);
+    R_HALF.push(manualXor(newRight, L_HALF[roundIndex]));
+}
+
+OUTPUT = inverseInitialPermutation(R_HALF[16] + L_HALF[16]); // Inverse initial permutation //
+
+createOutput(); // End //
 
 
 // #endregion
@@ -252,7 +252,8 @@ function createOutput(){
     }
     data = data + '\n';
     for(let i = 0; i < 16; i++){ // K1:K16
-        data = data + 'K' + (i + 1).toString() + '=' + SUBKEYS[i] + '\n';
+        let j = INPUT.encryption ? (i) : (15 - i);
+        data = data + 'K' + (i + 1).toString() + '=' + SUBKEYS[j] + '\n';
     }
     data = data + '\n';
     for(let i = 0; i <= 16; i++){ // L0:L16, R0:R16
@@ -305,11 +306,12 @@ function keyThroughPC1(){
 
 /**
  * Shifts latest C/D-keys left according to `SCHEDULE[]` and pushes them to `C_KEYS`\\`D_KEYS`.
+ * @param {number} roundIndex Round of keys being shifted
  */
-function shiftKey(){
-    let new_C = C_KEYS[ROUND];
-    let new_D = D_KEYS[ROUND];
-    for (let i = 0; i < SCHEDULE[ROUND]; i++){
+function shiftKey(roundIndex){
+    let new_C = C_KEYS[roundIndex];
+    let new_D = D_KEYS[roundIndex];
+    for (let i = 0; i < SCHEDULE[roundIndex]; i++){
         new_C = (new_C + new_C[0]).substring(1);
         new_D = (new_D + new_D[0]).substring(1);
     }
@@ -319,9 +321,10 @@ function shiftKey(){
 
 /**
  * Creates subkey from latest C/D-keys and adds them to `SUBKEYS[]`.
+ * @param {number} roundIndex Round of keys being permuted
  */
-function subkeyGeneration(){
-    let block = C_KEYS[ROUND+1] + D_KEYS[ROUND+1];
+function subkeyGeneration(roundIndex){
+    let block = C_KEYS[roundIndex + 1] + D_KEYS[roundIndex + 1];
     let permutation = '';
     for(let index of PC_2)
         permutation = permutation + block[index - 1];
@@ -334,17 +337,18 @@ function subkeyGeneration(){
 
 /**
  * Performs Feistel Function on latest Right block.
+ * @param {string} subkey Subkey to be used in manualXor
  * @returns {string} Feistel'd right side binary string
  */
-function feistelFunction(){
-    let expansion = expansionPermutation();
-    let xor = manualXor(expansion, SUBKEYS[ROUND]);
+function feistelFunction(roundIndex, subkey){
+    let expansion = expansionPermutation(roundIndex);
+    let xor = manualXor(expansion, subkey);
     let sbox = sboxSubstitution(xor);
     return permuteFeistel(sbox);    
 }
 
-function expansionPermutation(){
-    let right = R_HALF[ROUND];
+function expansionPermutation(roundIndex){
+    let right = R_HALF[roundIndex];
     let permutation = '';
     for(let index of EXPANSION_PERMUTATION)
         permutation = permutation + right[index - 1];
