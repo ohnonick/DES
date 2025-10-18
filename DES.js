@@ -170,7 +170,6 @@ if (INPUT.encryption == true){
         subkeyGeneration();
         if (ROUND != 16){
             let newRight = feistelFunction();
-            console.log("Permuted:", newRight, "\n")
             L_HALF.push(R_HALF[ROUND]);
             R_HALF.push(manualXor(newRight, L_HALF[ROUND]));
         }else{
@@ -195,14 +194,14 @@ createOutput();
 function readInput() {
     try {
         const data = fs.readFileSync(ARGS[2], 'utf8').trim();
-        console.log('Input File:\n', data);
+        console.log('\nINPUT FILE:\n' + data + '\n\n---\n\n');
 
         let inputCommands = data.split('\n').map(line => line.trim());
 
         // Just assuming the file will always be formatted correctly
         INPUT = {
-            dataBlock: argumentToBinary(inputCommands[0]),
-            key: argumentToBinary(inputCommands[1]),
+            dataBlock: hexToBinary(inputCommands[0]),
+            key: hexToBinary(inputCommands[1]),
             encryption: inputCommands[2].includes('encryption'),
         };
 
@@ -212,21 +211,37 @@ function readInput() {
 }
 
 /**
- * Turns argument into a string of binary characters.
- * @param {string} input String representing hexadecimal value
- * @returns {string} Padded binary string
+ * Turns argument into a 64-bit string of binary characters.
+ * @param {string} hexString String representing hexadecimal value
+ * @returns {string} Padded 64-bit binary string
  */
-function argumentToBinary(input) {
-    const hexMatch = input.match(/:\s*([0-9A-Fa-f]+)/);
+function hexToBinary(hexString) {
+    const hexMatch = hexString.match(/:\s*([0-9A-Fa-f]+)/);
     if (!hexMatch) {
         console.error("Invalid input format for hexadecimal value.");
         return "";
     }
     let hex = hexMatch[1];
-    let decimal = parseInt(hex, 16);
-    let binaryString = decimal.toString(2);
-    let paddedBinary = binaryString.padStart(64, '0');
-    return paddedBinary;
+    hex = hex.padStart(16, '0');
+    let binaryString = '';
+    for (let char of hex) {
+        binaryString = binaryString + parseInt(char, 16).toString(2).padStart(4, '0');
+    }
+    return binaryString;
+}
+
+/**
+ * Converts a 64-bit binary string to a padded 16-character hex string.
+ * @param {string} binaryString 64-bit binary string
+ * @returns {string} Padded 16-chararacter hex string in uppercase
+ */
+function binaryToHex(binaryString) {
+    let hex = '';
+    for (let i = 0; i < 64; i += 4) {
+        const chunk = binaryString.substring(i, i + 4);
+        hex += parseInt(chunk, 2).toString(16);
+    }
+    return hex.toUpperCase().padStart(16, '0');
 }
 
 function createOutput(){
@@ -245,12 +260,12 @@ function createOutput(){
         data = data + 'R' + i.toString() + '=' + R_HALF[i] + '\n';
     }
     data = data + '\n';
-    data = data + 'Result=' + parseInt(OUTPUT, 2).toString(16).toUpperCase();
+    data = data + 'Result=' + binaryToHex(OUTPUT);
 
 
     fs.writeFile(ARGS[3], data, (err) => {
         if (err) throw err;
-        console.log('File saved! Output:\n', data);
+        console.log('[FILE SAVED!] OUTPUT FILE:\n' + data + '\n');
     });
 }
 
@@ -263,12 +278,9 @@ function createOutput(){
  * @returns {string} Shuffled padded binary string
  */
 function initialPermutation(){
-    console.log("Input:", INPUT.dataBlock);
     let newBits = '';
-    INITIAL_PERMUTATION.forEach((index, i) =>{
+    for(let index of INITIAL_PERMUTATION)
         newBits = newBits + INPUT.dataBlock[index - 1];
-    });
-    console.log("Output:", newBits);
     return newBits;
 }
 
@@ -276,14 +288,9 @@ function initialPermutation(){
  * Generates first C/D-keys and adds them to `C_KEYS`\\`D_KEYS`.
  */
 function keyThroughPC1(){
-    console.log("Key:", INPUT.key);
-
-    // Permute bits using PC-1
     let permutation = '';
-    PC_1.forEach((index, i) =>{
+    for(let index of PC_1)
         permutation = permutation + INPUT.key[index - 1];
-    });
-    console.log("Permuted:", permutation);
 
     // Create substrings
     let C = permutation.substring(0, 28);
@@ -314,14 +321,10 @@ function shiftKey(){
  * Creates subkey from latest C/D-keys and adds them to `SUBKEYS[]`.
  */
 function subkeyGeneration(){
-    let block = C_KEYS[ROUND] + D_KEYS[ROUND];
-
-    // Permute bits using PC-2
+    let block = C_KEYS[ROUND+1] + D_KEYS[ROUND+1];
     let permutation = '';
-    PC_2.forEach((index, i) =>{
+    for(let index of PC_2)
         permutation = permutation + block[index - 1];
-    });
-
     SUBKEYS.push(permutation);
 }
 
@@ -334,25 +337,17 @@ function subkeyGeneration(){
  * @returns {string} Feistel'd right side binary string
  */
 function feistelFunction(){
-    console.log("OG:", R_HALF[ROUND])
     let expansion = expansionPermutation();
-    console.log("Expansion:", expansion)
     let xor = manualXor(expansion, SUBKEYS[ROUND]);
-    console.log("XOR:", xor)
     let sbox = sboxSubstitution(xor);
-    console.log("Sbox:", sbox)
     return permuteFeistel(sbox);    
 }
 
 function expansionPermutation(){
     let right = R_HALF[ROUND];
     let permutation = '';
-
-    // Permute bits using Expansion Permutation table
-    EXPANSION_PERMUTATION.forEach((index, i) =>{
+    for(let index of EXPANSION_PERMUTATION)
         permutation = permutation + right[index - 1];
-    });
-
     return permutation;
 }
 
@@ -389,11 +384,8 @@ function sboxSubstitution(xor){
 
 function permuteFeistel(sbox){
     let permutation = '';
-
-    // Permute bits using Permutation table
-    PERMUTATION_FUNCTION.forEach((index, i) =>{
+    for(let index of PERMUTATION_FUNCTION)
         permutation = permutation + sbox[index - 1];
-    });
 
     return permutation;
 }
@@ -409,9 +401,8 @@ function permuteFeistel(sbox){
  */
 function inverseInitialPermutation(concatenation){
     let newBits = '';
-    INVERSE_IP.forEach((index, i) =>{
+    for(let index of INVERSE_IP)
         newBits = newBits + concatenation[index - 1];
-    });
     return newBits;
 }
 
